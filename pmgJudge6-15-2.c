@@ -457,76 +457,83 @@ void backprop(int answer) {
     }
 
     //bias[3] synapse[3]の更新
-    int l=AllLay-1;
-    for(int i=0;i<10;i++){ //layの値を0に初期化 //iは出力元
-        double y = (i == answer) ? 1.0 : 0.0;
+    for(int l = 3; l >= 0; l--){
+        //bias[3] synapse[3]の更新
+        if(l==AllLay-1){
+            #pragma omp parallel for default(none) shared(delta,judgelay, answer, totalBias, totalSynapse, lay, total, size, l)
+            for(int i=0;i<10;i++){ //layの値を0に初期化 //iは出力元
+                double y = (i == answer) ? 1.0 : 0.0;
+                double sum =0;
 
-        total[i] = -y/judgelay[i] +(1-y)/(1-judgelay[i]); // 誤差を計算
-        totalBias[l][i] += total[i]; // バイアスの誤差を計算
+                sum = -y/judgelay[i] +(1-y)/(1-judgelay[i]); // 誤差を計算
+                totalBias[l][i] += sum; 
 
-        for(int j = 0; j < size; j++) {//jは入力元
-            totalSynapse[l][j][i] +=lay[l][j]*total[i];
-        }
-    }
-    for(int i = 0; i < 10; i++) {
-        delta[i] = total[i];
-        total[i]=0;
-    }
+                for(int j = 0; j < size; j++) {//jは入力元
+                    totalSynapse[l][j][i] +=lay[l][j]*sum;
+                }
+                delta[i] = sum;
 
-    //bias[2] synapse[2]の更新
-    l=AllLay-2;
-    for(int i = 0; i < size; i++) {//iは出力元  
-
-            for(int j = 0; j < 10; j++) {
-                total[i] += synapse[l+1][i][j]*delta[j];
             }
 
-            if(lay[l][i] <= 0.0f){
-                total[i] *= 0.01f;
-            }
-                  
-            totalBias[l][i] += total[i];
+        }else if(l==AllLay-2){
+        //bias[2] synapse[2]の更新
+            #pragma omp parallel for default(none) shared(synapse, delta, totalBias, totalSynapse, lay, total, size, l)
+            for(int i = 0; i < size; i++) {//iは出力元  
+                double sum =0;
+                if(lay[l][i] > 0.0f){
+                    for(int j = 0; j < 10; j++) {
+                        sum += synapse[l+1][i][j]*delta[j];
+                    }
 
-            for(int j = 0; j < size; j++) {//jは入力元
+                    totalBias[l][i] += sum;
+
+                    for(int j = 0; j < size; j++) {//jは入力元
+                    
+                        totalSynapse[l][j][i] += lay[l][j] * sum;
+                    }
+                }
                 
-                totalSynapse[l][j][i] += lay[l][j] * total[i];
+                total[i] =sum;
+
             }
-    }
-
-    for(int i = 0; i < size; i++) {
-        delta[i] = total[i];
-        total[i]=0;
-    }
-
-  
-
-    
-    //bias[0-1] synapse[0-1]の更新
-        for(int l = 1; l >= 0; l--) { 
 
             for(int i = 0; i < size; i++) {
-                
-                    for(int j = 0; j < size; j++) {
-                        total[i] += synapse[l+1][i][j]*delta[j];
-                    }
-                    if(lay[l][i] <= 0.0f){
-                        total[i] *= 0.01f;// ReLUの微分
-                    }
-                        
-                    totalBias[l][i] += total[i];
+                delta[i] = total[i];
+                total[i]=0;
+            }
 
-                    for(int j = 0; j < size; j++) {
-                        
-                        totalSynapse[l][j][i] += lay[l][j] * total[i];
+    
+
+        }else{
+        #pragma omp parallel for default(none) shared(synapse, delta, totalBias, totalSynapse, lay, total, size, l)
+        //bias[0-1] synapse[0-1]の更新           
+            for(int i = 0; i < size; i++) {
+
+                    double sum=0;
+                    if(lay[l][i] > 0.0f){
+                        for(int j = 0; j < size; j++) {
+                            sum += synapse[l+1][i][j]*delta[j];
+                        }
+            
+                            
+                        totalBias[l][i] += sum;
+
+                        for(int j = 0; j < size; j++) {
+                            
+                            totalSynapse[l][j][i] += lay[l][j] * sum;
+                        }
                     }
+                    total[i]=sum;
                 
             }
             for(int i = 0; i < size; i++) {
                 delta[i] = total[i];
                 total[i]=0;
             }
+        
         }
 
+    }
 
 
 
